@@ -8,8 +8,9 @@ SRC_DIR := src
 BUILD_DIR := build
 
 FMT_INC := ./fmt/include
-
 CFLAGS += -I $(FMT_INC)
+
+BLOCK_SIZE ?= 1024
 
 BIN := rush
 

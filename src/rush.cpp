@@ -3,7 +3,13 @@
 #include <iostream>
 #include <fmt/core.h>
 
+#include "fs.h"
+
 int main(int argc, char **argv)
 {
-    fmt::print("Hello, World!\n");
+    if (argc != 2)
+    {
+        fmt::println("Usage: rush [filename]");
+        return 1;
+    }
 }
