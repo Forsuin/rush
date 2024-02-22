@@ -43,11 +43,6 @@ struct IFSWritable
     virtual void write(std::string fs_name, uint32_t block_addr) const = 0;
 };
 
-struct IFSWritable
-{
-    virtual void write(std::string fs_name, uint32_t block_addr) const = 0;
-};
-
 /*
     In a real ext2 system, the superblock is located 1024 bytes from
     the beginning of disk. This is to make room for the bootloader
