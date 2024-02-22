@@ -1,4 +1,9 @@
 #include <cstdint>
+#include <string>
+
+#include "expected.hpp"
+#include "optional.hpp"
+#include "monostate.hpp"
 
 /*
 
@@ -55,8 +60,8 @@ struct Superblock
 */
 struct BlockGroupDescriptor
 {
-    uint32_t block_bitmap;
-    uint32_t inode_bitmap;
+    uint32_t block_bitmap_addr;
+    uint32_t inode_bitmap_addr;
     uint32_t inode_table;
     uint16_t free_blocks;
     uint16_t free_inodes;
@@ -84,7 +89,10 @@ struct Inode
     uint64_t size;
     uint16_t link_count;
     uint32_t block_ptrs[NUM_BLOCK_PTR];
+    char _pad[48];
 };
+
+#define s sizeof(Inode)
 
 /*
     Describes the layout of a entry into a directory
@@ -96,3 +104,17 @@ struct DirEntry
     FileType type;
     std::string name;
 };
+
+/*
+    Creates and initializes filesystem to a default state with root directory created
+
+    Creates blocks, block groups, inodes, superblock, and descriptor table
+
+    fs_size is the total size of the filesystem given in KiB
+    block_size is the size of each block, is a power of 2 (1024, 2048, 4096, etc)
+
+    fs_size defaults to 1024 KiB
+    block_size defaults to 1024 bytes
+    inode_ratio defaults to 1024 bytes / inode as most of these files should be failry small
+*/
+tl::expected<monostate, std::string> init_fs(int fs_size, int block_size, std::string fs_name, int inode_ratio);
