@@ -92,8 +92,6 @@ struct Inode
     char _pad[48];
 };
 
-#define s sizeof(Inode)
-
 /*
     Describes the layout of a entry into a directory
 */
@@ -117,4 +115,4 @@ struct DirEntry
     block_size defaults to 1024 bytes
     inode_ratio defaults to 1024 bytes / inode as most of these files should be failry small
 */
-tl::expected<monostate, std::string> init_fs(int fs_size, int block_size, std::string fs_name, int inode_ratio);
+tl::expected<monostate, std::string> mkfs(int fs_size, int block_size, std::string fs_name, int inode_ratio);

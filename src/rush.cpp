@@ -44,5 +44,7 @@ int main(int argc, char **argv)
     fs_size = std::stoi(parser.value("fs_size"));
     inode_ratio = std::stoi(parser.value("inode_ratio"));
 
-    init_fs(fs_size, block_size, fs_name, inode_ratio);
+    mkfs(fs_size, block_size, fs_name, inode_ratio)
+        .map_error([&](std::string s)
+                   { fmt::println("{}", s); });
 }
