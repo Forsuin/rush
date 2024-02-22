@@ -1,15 +1,13 @@
 #define FMT_HEADER_ONLY
 
-#include <fstream>
 #include <cmath>
 
 #include "fs.hpp"
 #include "fmt/core.h"
 
-unsigned long long operator""_MiB(unsigned long long size_mib)
+void write_to_fs(std::string fs_name, const IFSWritable &writable, uint32_t block_addr)
 {
-    // return KiB
-    return size_mib << 10;
+    writable.write(fs_name, block_addr);
 }
 
 tl::expected<monostate, std::string> mkfs(int fs_size, int block_size, std::string fs_name, int inode_ratio)
@@ -18,7 +16,7 @@ tl::expected<monostate, std::string> mkfs(int fs_size, int block_size, std::stri
     fs_size = fs_size * 1024;
 
     std::ofstream ofile(fs_name, std::ios::binary);
-    ofile.seekp((fs_size << 10) - 1);
+    ofile.seekp((fs_size)-1);
     ofile.write("a", 1);
 
     if (block_size % 1024 != 0)
@@ -44,6 +42,18 @@ tl::expected<monostate, std::string> mkfs(int fs_size, int block_size, std::stri
 
     fmt::println("Num Blocks: {}, Num Inodes: {}, Blocks Per Group: {}, Inodes Per Group: {}",
                  num_blocks, num_inodes, blocks_per_group, inodes_per_group);
+
+    Superblock sb;
+
+    sb.num_blocks = num_blocks;
+    sb.num_inodes = num_inodes;
+    sb.num_free_blocks = num_blocks;
+    sb.num_free_inodes = num_inodes;
+    sb.log_block_size = log2_size;
+    sb.blocks_per_group = blocks_per_group;
+    sb.inodes_per_group = inodes_per_group;
+
+    write_to_fs(fs_name, sb, 0);
 
     return monostate{};
 }
