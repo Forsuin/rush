@@ -43,9 +43,6 @@ struct IFSWritable
     virtual void write(std::string fs_name, uint32_t block_addr) const = 0;
 };
 
-#define BYTE_INFO(x) (char *)&x, sizeof(x)
-#define WRITE(ofile, x) ofile.write(BYTE_INFO(x))
-
 struct IFSWritable
 {
     virtual void write(std::string fs_name, uint32_t block_addr) const = 0;
