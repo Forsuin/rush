@@ -1,10 +1,13 @@
 #define FMT_HEADER_ONLY
 
 #include <cmath>
+#include <vector>
 
 #include "fs.hpp"
 #include "fmt/core.h"
 
+// Have this helper that just calls the writable's write function since I don't want to
+// have to write it myself multiple times
 void write_to_fs(std::string fs_name, const IFSWritable &writable, uint32_t block_addr)
 {
     writable.write(fs_name, block_addr);
@@ -17,7 +20,7 @@ tl::expected<monostate, std::string> mkfs(int fs_size, int block_size, std::stri
 
     std::ofstream ofile(fs_name, std::ios::binary);
     ofile.seekp((fs_size)-1);
-    ofile.write("a", 1);
+    ofile.write("\0", 1);
 
     if (block_size % 1024 != 0)
     {
@@ -26,7 +29,7 @@ tl::expected<monostate, std::string> mkfs(int fs_size, int block_size, std::stri
 
     int mut_block_size = block_size;
     int log2_size = 0;
-    while (mut_block_size > 1)
+    while (mut_block_size > 1024)
     {
         mut_block_size >>= 1; // Divide by 2
         log2_size += 1;
@@ -35,13 +38,13 @@ tl::expected<monostate, std::string> mkfs(int fs_size, int block_size, std::stri
     // This will lead to a bit of wasted space, but it's easiest to just make
     // full sized blocks and ignore the little bit left over
     int num_blocks = fs_size / block_size;
-    int num_inodes = fs_size / inode_ratio;
+    int num_inodes = (num_blocks * block_size) / inode_ratio;
     int blocks_per_group = block_size * 8;
     int num_groups = std::ceil((double)num_blocks / (double)blocks_per_group);
     int inodes_per_group = std::ceil((double)num_inodes / (double)num_groups);
 
-    fmt::println("Num Blocks: {}, Num Inodes: {}, Blocks Per Group: {}, Inodes Per Group: {}",
-                 num_blocks, num_inodes, blocks_per_group, inodes_per_group);
+    // fmt::println("Log Block Size: {}, Num Blocks: {}, Num Inodes: {}, Blocks Per Group: {}, Inodes Per Group: {}",
+    //              log2_size, num_blocks, num_inodes, blocks_per_group, inodes_per_group);
 
     Superblock sb;
 
@@ -52,8 +55,70 @@ tl::expected<monostate, std::string> mkfs(int fs_size, int block_size, std::stri
     sb.log_block_size = log2_size;
     sb.blocks_per_group = blocks_per_group;
     sb.inodes_per_group = inodes_per_group;
+    sb.blocks_reserved = 1; // reserve superblock
+
+    // Block Group Descriptor Table
 
     write_to_fs(fs_name, sb, 0);
+
+    int gdt_blocks = (num_groups * sizeof(BlockGroupDescriptor)) / block_size;
+    // acount for any partial block needed
+    if ((num_groups * sizeof(BlockGroupDescriptor)) % block_size)
+        gdt_blocks++;
+
+    sb.blocks_reserved += gdt_blocks;
+
+    std::ofstream(fs_name, std::ios::binary | std::ios::app);
+
+    // skip over superblock and the blocks reserved for table
+    int first_free_block = sb.blocks_reserved + gdt_blocks;
+
+    for (int i = 0; i < gdt_blocks; i++)
+    {
+        BlockGroupDescriptor bgd;
+        // byte address of start of group
+        int group_start = block_size * (i + 1);
+
+        ofile.seekp(group_start + (i * 32), std::ios::beg);
+
+        bgd.block_bitmap_addr = first_free_block;
+        bgd.inode_bitmap_addr = first_free_block + 1;
+        bgd.inode_table = first_free_block + 2;
+        bgd.num_dirs = 0;
+        bgd.free_blocks = blocks_per_group - 3;
+        bgd.free_inodes = inodes_per_group;
+
+        // fmt::println("group_start: {}, seek_pos: {}, bitmap_addr: {}, inode_addr: {}, inode_table: {}, num_dirs: {}, free_blocks: {}, free_inodes: {}",
+        //              group_start, group_start + (i * 32), bgd.block_bitmap_addr, bgd.inode_bitmap_addr, bgd.inode_table, bgd.num_dirs, bgd.free_blocks, bgd.free_inodes);
+
+        WRITE(ofile, bgd.block_bitmap_addr);
+        WRITE(ofile, bgd.inode_bitmap_addr);
+        WRITE(ofile, bgd.inode_table);
+        WRITE(ofile, bgd.num_dirs);
+        WRITE(ofile, bgd.free_blocks);
+        WRITE(ofile, bgd.free_inodes);
+        WRITE(ofile, bgd._pad);
+
+        // write inodes for this group
+        int addr = bgd.inode_table * block_size;
+        ofile.seekp(addr, std::ios::beg);
+
+        for (int i = 0; i < inodes_per_group; i++)
+        {
+            Inode inode;
+
+            WRITE(ofile, inode.type);
+            WRITE(ofile, inode.size);
+            WRITE(ofile, inode.link_count);
+
+            for (int j = 0; j < NUM_BLOCK_PTR; j++)
+            {
+                inode.block_ptrs[j] = 0x55555555 + j;
+            }
+            WRITE(ofile, inode.block_ptrs);
+            WRITE(ofile, inode._pad);
+        }
+    }
 
     return monostate{};
 }
