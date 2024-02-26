@@ -57,7 +57,7 @@ tl::expected<monostate, std::string> mkfs(int fs_size, int block_size, std::stri
     sb.inodes_per_group = inodes_per_group;
     sb.blocks_reserved = 1; // reserve superblock
 
-    // Block Group Descriptor Table
+    // ===========Block Group Descriptor Table===================
 
     write_to_fs(fs_name, sb, 0);
 
@@ -72,6 +72,9 @@ tl::expected<monostate, std::string> mkfs(int fs_size, int block_size, std::stri
 
     // skip over superblock and the blocks reserved for table
     int first_free_block = sb.blocks_reserved + gdt_blocks;
+
+    std::vector<BlockGroupDescriptor> descriptors;
+    std::vector<Inode> inodes;
 
     for (int i = 0; i < gdt_blocks; i++)
     {
@@ -99,6 +102,8 @@ tl::expected<monostate, std::string> mkfs(int fs_size, int block_size, std::stri
         WRITE(ofile, bgd.free_inodes);
         WRITE(ofile, bgd._pad);
 
+        descriptors.push_back(bgd);
+
         // write inodes for this group
         int addr = bgd.inode_table * block_size;
         ofile.seekp(addr, std::ios::beg);
@@ -110,15 +115,31 @@ tl::expected<monostate, std::string> mkfs(int fs_size, int block_size, std::stri
             WRITE(ofile, inode.type);
             WRITE(ofile, inode.size);
             WRITE(ofile, inode.link_count);
-
-            for (int j = 0; j < NUM_BLOCK_PTR; j++)
-            {
-                inode.block_ptrs[j] = 0x55555555 + j;
-            }
             WRITE(ofile, inode.block_ptrs);
             WRITE(ofile, inode._pad);
+
+            inodes.push_back(inode);
         }
     }
 
-    return monostate{};
+    // ============ Root Directory =============
+
+    BlockGroupDescriptor &first_group = descriptors[0];
+    int inode_table = first_group.inode_table * block_size;
+
+    Inode
+
+        return monostate{};
+}
+
+bool is_dir(Inode &inode)
+{
+    return inode.type == FileType::Directory;
+}
+
+uint32_t find_block(uint32_t inode_addr, Superblock &sb)
+{
+    uint32_t group = (inode_addr - 1) / sb.inodes_per_group;
+    uint32_t index = (inode_addr - 1) % sb.inodes_per_group;
+    return index * sizeof(Inode) / (1024 << sb.log_block_size);
 }

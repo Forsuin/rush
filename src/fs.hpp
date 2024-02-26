@@ -1,3 +1,5 @@
+
+
 #include <cstdint>
 #include <string>
 #include <fstream>
@@ -105,10 +107,10 @@ enum class FileType : uint16_t
 */
 struct Inode
 {
-    FileType type = FileType::Directory;
-    uint64_t size = UINT64_MAX;
-    uint16_t link_count = UINT16_MAX;
-    uint32_t block_ptrs[NUM_BLOCK_PTR];
+    FileType type = FileType::Unused;
+    uint64_t size = 0;
+    uint16_t link_count = 0;
+    uint32_t block_ptrs[NUM_BLOCK_PTR] = {0};
     char _pad[42] = {0};
 };
 
@@ -120,7 +122,7 @@ struct DirEntry
     uint32_t inode;
     uint16_t entry_size;
     FileType type;
-    std::string name;
+    char name[11];
 };
 
 /*
@@ -136,3 +138,10 @@ struct DirEntry
     inode_ratio defaults to 1024 bytes / inode as most of these files should be failry small
 */
 tl::expected<monostate, std::string> mkfs(int fs_size, int block_size, std::string fs_name, int inode_ratio);
+
+bool is_dir(Inode &inode);
+
+/*
+    Returns the address of an block containing an inode address
+*/
+uint32_t find_block(uint32_t inode_addr, Superblock &sb);
